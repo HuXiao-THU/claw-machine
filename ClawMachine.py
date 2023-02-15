@@ -25,5 +25,7 @@ class ClawMachine():
             self.miss_count += 1
             return -2
         
-    
+    def reset(self):
+        self.miss_count = 0
+        self.occupied = False
             

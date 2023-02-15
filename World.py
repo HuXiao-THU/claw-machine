@@ -1,7 +1,7 @@
 from ClawMachine import *
 import numpy as np
 
-class Environment():
+class World():
     def __init__(self):
         self.machines = []
         self.machine_num = 3
@@ -9,20 +9,37 @@ class Environment():
             self.machines.append(ClawMachine(10, 0.05))
         
         self.time_step = 0
+        self.max_time_step = 1e5
+
+        self.occupation_array = []
+        self.machine_being_observed = -1
+        self.watch_array = []
+
+        self.observation_space = 2 * self.machine_num  # [occupation array, watch array] (2machine_num x 1)
+        self.action_space = 2 * self.machine_num  # [play array, watch array] (2machine_num x 1) 
+
+        self.reset()
+
+    def reset(self):
+        for m in self.machines:
+            m.reset()
+        self.time_step = 0
 
         self.occupation_array = [0 for i in range(self.machine_num)]
         self.machine_being_observed = -1
         self.watch_array = [-1 for i in range(self.machine_num)]
 
+        return self.get_state()
+
     def get_state(self):
         self.update_occupation_array()
-        s = self.occupation_array + self.watch_array
-        return s
+        state = self.occupation_array + self.watch_array
+        return np.array(state)
 
     def step(self, action):
-        # action: one-hot variable [play array, watch array] (machine_num*1)
+        # action: id of one-hot variable [play array, watch array] (machine_num*2)
         self.time_step += 1
-        action_id = np.argmax(action)
+        action_id = action
         if action_id < self.machine_num:
             # play
             # 会忘记之前观察的结果
@@ -31,9 +48,9 @@ class Environment():
 
             if self.occupation_array[action_id] == 1:
                 # 插队惩罚
-                return -9999
-            
-            score = self.machines[action_id].play(isAgent = True)
+                r = -9999
+            else:
+                r = self.machines[action_id].play(isAgent = True)
 
             # 其他玩家玩耍
             for i in range(self.machine_num):
@@ -44,8 +61,6 @@ class Environment():
                     self.machines[i].play(isAgent = False)
                 elif random.random() < self.machines[i].occupied_ratio:
                     self.machines[i].play(isAgent = False)
-
-            return score
 
         else:
             # watch
@@ -73,8 +88,11 @@ class Environment():
                         else:
                             self.watch_array[i] += 1
                     
-
-            return -1
+            r = -1
+        
+        done = True if self.time_step >= self.max_time_step else False
+    
+        return (self.get_state(), r, done, {})
     
     def update_occupation_array(self):
         for i in range(self.machine_num):
